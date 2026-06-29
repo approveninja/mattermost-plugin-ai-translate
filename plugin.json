@@ -1,9 +1,10 @@
 {
-    "id": "com.mattermost.plugin-starter-template",
-    "name": "Plugin Starter Template",
-    "description": "This plugin serves as a starting point for writing a Mattermost plugin.",
-    "homepage_url": "https://github.com/mattermost/mattermost-plugin-starter-template",
-    "support_url": "https://github.com/mattermost/mattermost-plugin-starter-template/issues",
+    "id": "com.approveninja.ai-translate",
+    "name": "AI Translate",
+    "description": "AI-powered translation of Mattermost messages.",
+    "version": "0.1.0",
+    "homepage_url": "https://github.com/approveninja/mattermost-plugin-ai-translate",
+    "support_url": "https://github.com/approveninja/mattermost-plugin-ai-translate/issues",
     "icon_path": "assets/starter-template-icon.svg",
     "min_server_version": "6.2.1",
     "server": {

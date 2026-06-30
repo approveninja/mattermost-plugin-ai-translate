@@ -12,8 +12,11 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi/cluster"
 	"github.com/pkg/errors"
 
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/codexauth"
 	"github.com/approveninja/mattermost-plugin-ai-translate/server/command"
 	"github.com/approveninja/mattermost-plugin-ai-translate/server/store/kvstore"
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/translate"
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/translate/codex"
 )
 
 // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
@@ -34,6 +37,12 @@ type Plugin struct {
 
 	backgroundJob *cluster.Job
 
+	// authenticator manages Codex OAuth tokens with cluster-wide locking.
+	authenticator *codexauth.Authenticator
+
+	// translator calls the Codex API to translate messages.
+	translator translate.Translator
+
 	// configurationLock synchronizes access to the configuration.
 	configurationLock sync.RWMutex
 
@@ -47,6 +56,11 @@ func (p *Plugin) OnActivate() error {
 	p.client = pluginapi.NewClient(p.API, p.Driver)
 
 	p.kvstore = kvstore.NewKVStore(p.client)
+
+	store := codexauth.NewStore(kvAdapter{&p.client.KV})
+	locker := clusterLocker{api: p.API, key: "codex_oauth_refresh"}
+	p.authenticator = codexauth.NewAuthenticator(store, locker, nil, "")
+	p.translator = codex.New(p.authenticator, p.getConfiguration().model(), "", nil)
 
 	p.commandClient = command.NewCommandHandler(p.client)
 

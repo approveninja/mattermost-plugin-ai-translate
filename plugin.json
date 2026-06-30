@@ -22,6 +22,35 @@
     "settings_schema": {
         "header": "",
         "footer": "",
-        "settings": []
+        "settings": [
+            {
+                "key": "Model",
+                "display_name": "Codex model",
+                "type": "text",
+                "help_text": "The Codex model used for translation.",
+                "default": "gpt-5.5"
+            },
+            {
+                "key": "DefaultLanguage",
+                "display_name": "Default target language",
+                "type": "dropdown",
+                "help_text": "Default language new users translate into.",
+                "default": "EN",
+                "options": [
+                    {"display_name": "English", "value": "EN"},
+                    {"display_name": "Ukrainian", "value": "UA"},
+                    {"display_name": "Russian", "value": "RU"},
+                    {"display_name": "Polish", "value": "PL"},
+                    {"display_name": "Spanish", "value": "ES"},
+                    {"display_name": "French", "value": "FR"},
+                    {"display_name": "German", "value": "DE"},
+                    {"display_name": "Chinese", "value": "ZH"},
+                    {"display_name": "Italian", "value": "IT"},
+                    {"display_name": "Portuguese", "value": "PT"},
+                    {"display_name": "Japanese", "value": "JA"},
+                    {"display_name": "Turkish", "value": "TR"}
+                ]
+            }
+        ]
     }
 }

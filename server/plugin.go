@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,7 +86,12 @@ func (p *Plugin) OnActivate() error {
 		return post.Message, nil
 	}
 
-	p.commandClient = command.NewCommandHandler(p.client)
+	admin := codexAdmin{auth: p.authenticator, store: store}
+	isSysAdmin := func(userID string) bool {
+		u, err := p.client.User.Get(userID)
+		return err == nil && strings.Contains(u.Roles, "system_admin")
+	}
+	p.commandClient = command.NewCommandHandler(p.client, admin, isSysAdmin)
 
 	p.router = p.initRouter()
 

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -8,64 +9,84 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi"
 )
 
-type Handler struct {
-	client *pluginapi.Client
+// CodexAdmin drives the admin OAuth lifecycle from the slash command.
+type CodexAdmin interface {
+	Status() bool
+	Logout() error
+	Login(ctx context.Context) (userCode, verificationURL string, wait func() error, err error)
 }
 
+// Handler implements the /aitranslate slash command.
+type Handler struct {
+	client     *pluginapi.Client
+	admin      CodexAdmin
+	isSysAdmin func(userID string) bool
+}
+
+// Command is the interface consumed by plugin.go.
 type Command interface {
 	Handle(args *model.CommandArgs) (*model.CommandResponse, error)
-	executeHelloCommand(args *model.CommandArgs) *model.CommandResponse
 }
 
-const helloCommandTrigger = "hello"
+const trigger = "aitranslate"
 
-// Register all your slash commands in the NewCommandHandler function.
-func NewCommandHandler(client *pluginapi.Client) Command {
+// NewCommandHandler registers the /aitranslate command and returns a Command.
+func NewCommandHandler(client *pluginapi.Client, admin CodexAdmin, isSysAdmin func(string) bool) Command {
 	err := client.SlashCommand.Register(&model.Command{
-		Trigger:          helloCommandTrigger,
+		Trigger:          trigger,
 		AutoComplete:     true,
-		AutoCompleteDesc: "Say hello to someone",
-		AutoCompleteHint: "[@username]",
-		AutocompleteData: model.NewAutocompleteData(helloCommandTrigger, "[@username]", "Username to say hello to"),
+		AutoCompleteDesc: "Manage AI Translate",
+		AutoCompleteHint: "[login|status|logout]",
+		AutocompleteData: model.NewAutocompleteData(trigger, "[login|status|logout]", "Manage AI Translate Codex connection"),
 	})
 	if err != nil {
 		client.Log.Error("Failed to register command", "error", err)
 	}
-	return &Handler{
-		client: client,
-	}
+	return &Handler{client: client, admin: admin, isSysAdmin: isSysAdmin}
 }
 
-// ExecuteCommand hook calls this method to execute the commands that were registered in the NewCommandHandler function.
-func (c *Handler) Handle(args *model.CommandArgs) (*model.CommandResponse, error) {
+func ephemeral(text string) *model.CommandResponse {
+	return &model.CommandResponse{ResponseType: model.CommandResponseTypeEphemeral, Text: text}
+}
+
+// Handle dispatches /aitranslate [login|status|logout].
+func (h *Handler) Handle(args *model.CommandArgs) (*model.CommandResponse, error) {
 	fields := strings.Fields(args.Command)
-	if len(fields) == 0 {
-		return &model.CommandResponse{
-			ResponseType: model.CommandResponseTypeEphemeral,
-			Text:         "Empty command",
-		}, nil
+	sub := ""
+	if len(fields) >= 2 {
+		sub = strings.ToLower(fields[1])
 	}
-	trigger := strings.TrimPrefix(fields[0], "/")
-	switch trigger {
-	case helloCommandTrigger:
-		return c.executeHelloCommand(args), nil
-	default:
-		return &model.CommandResponse{
-			ResponseType: model.CommandResponseTypeEphemeral,
-			Text:         fmt.Sprintf("Unknown command: %s", args.Command),
-		}, nil
-	}
-}
-
-func (c *Handler) executeHelloCommand(args *model.CommandArgs) *model.CommandResponse {
-	if len(strings.Fields(args.Command)) < 2 {
-		return &model.CommandResponse{
-			ResponseType: model.CommandResponseTypeEphemeral,
-			Text:         "Please specify a username",
+	switch sub {
+	case "status":
+		if h.admin.Status() {
+			return ephemeral("AI Translate is connected to Codex."), nil
 		}
-	}
-	username := strings.Fields(args.Command)[1]
-	return &model.CommandResponse{
-		Text: "Hello, " + username,
+		return ephemeral("AI Translate is not connected. An admin can run `/aitranslate login`."), nil
+	case "logout":
+		if !h.isSysAdmin(args.UserId) {
+			return ephemeral("Only a system administrator can do that."), nil
+		}
+		if err := h.admin.Logout(); err != nil {
+			return ephemeral("Logout failed: " + err.Error()), nil
+		}
+		return ephemeral("Disconnected from Codex."), nil
+	case "login":
+		if !h.isSysAdmin(args.UserId) {
+			return ephemeral("Only a system administrator can connect Codex."), nil
+		}
+		code, url, wait, err := h.admin.Login(context.Background())
+		if err != nil {
+			return ephemeral("Could not start login: " + err.Error()), nil
+		}
+		go func() {
+			if err := wait(); err != nil {
+				h.client.Log.Error("Codex device login failed", "err", err)
+			}
+		}()
+		return ephemeral(fmt.Sprintf(
+			"To connect Codex:\n1. Open %s\n2. Enter code: **%s**\n\nThen run `/aitranslate status` to confirm.",
+			url, code)), nil
+	default:
+		return ephemeral("Usage: `/aitranslate [login|status|logout]`"), nil
 	}
 }

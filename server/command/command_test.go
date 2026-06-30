@@ -1,47 +1,58 @@
 package command
 
 import (
+	"context"
 	"testing"
 
 	"github.com/mattermost/mattermost/server/public/model"
-	"github.com/mattermost/mattermost/server/public/plugin/plugintest"
-	"github.com/mattermost/mattermost/server/public/pluginapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-type env struct {
-	client *pluginapi.Client
-	api    *plugintest.API
+type fakeAdmin struct {
+	connected bool
+	loggedOut bool
 }
 
-func setupTest() *env {
-	api := &plugintest.API{}
-	driver := &plugintest.Driver{}
-	client := pluginapi.NewClient(api, driver)
+func (f *fakeAdmin) Status() bool  { return f.connected }
+func (f *fakeAdmin) Logout() error { f.loggedOut = true; return nil }
+func (f *fakeAdmin) Login(context.Context) (string, string, func() error, error) {
+	return "ABCD-1234", "https://auth.openai.com/codex/device", func() error { return nil }, nil
+}
 
-	return &env{
-		client: client,
-		api:    api,
+func newTestHandler(admin *fakeAdmin, admins map[string]bool) *Handler {
+	return &Handler{
+		admin:      admin,
+		isSysAdmin: func(uid string) bool { return admins[uid] },
 	}
 }
 
-func TestHelloCommand(t *testing.T) {
-	assert := assert.New(t)
-	env := setupTest()
+func TestStatusCommand(t *testing.T) {
+	h := newTestHandler(&fakeAdmin{connected: true}, map[string]bool{"a": true})
+	resp, err := h.Handle(&model.CommandArgs{UserId: "a", Command: "/aitranslate status"})
+	require.NoError(t, err)
+	assert.Contains(t, resp.Text, "connected")
+}
 
-	env.api.On("RegisterCommand", &model.Command{
-		Trigger:          helloCommandTrigger,
-		AutoComplete:     true,
-		AutoCompleteDesc: "Say hello to someone",
-		AutoCompleteHint: "[@username]",
-		AutocompleteData: model.NewAutocompleteData("hello", "[@username]", "Username to say hello to"),
-	}).Return(nil)
-	cmdHandler := NewCommandHandler(env.client)
+func TestLoginRequiresAdmin(t *testing.T) {
+	h := newTestHandler(&fakeAdmin{}, map[string]bool{"a": true})
+	resp, err := h.Handle(&model.CommandArgs{UserId: "u", Command: "/aitranslate login"})
+	require.NoError(t, err)
+	assert.Contains(t, resp.Text, "administrator")
+}
 
-	args := &model.CommandArgs{
-		Command: "/hello world",
-	}
-	response, err := cmdHandler.Handle(args)
-	assert.Nil(err)
-	assert.Equal("Hello, world", response.Text)
+func TestLoginShowsCode(t *testing.T) {
+	h := newTestHandler(&fakeAdmin{}, map[string]bool{"a": true})
+	resp, err := h.Handle(&model.CommandArgs{UserId: "a", Command: "/aitranslate login"})
+	require.NoError(t, err)
+	assert.Contains(t, resp.Text, "ABCD-1234")
+	assert.Contains(t, resp.Text, "codex/device")
+}
+
+func TestLogout(t *testing.T) {
+	admin := &fakeAdmin{connected: true}
+	h := newTestHandler(admin, map[string]bool{"a": true})
+	_, err := h.Handle(&model.CommandArgs{UserId: "a", Command: "/aitranslate logout"})
+	require.NoError(t, err)
+	assert.True(t, admin.loggedOut)
 }

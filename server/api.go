@@ -42,17 +42,22 @@ func (p *Plugin) handleTranslate(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request.")
 		return
 	}
+	userID := r.Header.Get("Mattermost-User-ID")
 	text := req.Text
 	if req.PostID != "" && p.resolvePostText != nil {
-		resolved, err := p.resolvePostText(req.PostID)
+		resolved, err := p.resolvePostText(userID, req.PostID)
 		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "Could not load that message.")
+			writeJSONError(w, http.StatusForbidden, "You don't have access to that message.")
 			return
 		}
 		text = resolved
 	}
 	if strings.TrimSpace(text) == "" {
 		writeJSONError(w, http.StatusBadRequest, "Nothing to translate.")
+		return
+	}
+	if !translate.IsSupported(req.TargetLang) {
+		writeJSONError(w, http.StatusBadRequest, "Unsupported language.")
 		return
 	}
 

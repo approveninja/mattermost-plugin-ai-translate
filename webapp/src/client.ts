@@ -12,7 +12,7 @@ export class Client {
     async translate(postId: string, targetLang: string): Promise<string> {
         const res = await fetch(`${BASE}/translate`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
             body: JSON.stringify({postId, targetLang}),
         });
         const data = await this.parse(res);
@@ -20,7 +20,7 @@ export class Client {
     }
 
     async getLang(): Promise<string> {
-        const res = await fetch(`${BASE}/prefs/lang`);
+        const res = await fetch(`${BASE}/prefs/lang`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
         const data = await this.parse(res);
         return data.lang as string;
     }
@@ -28,7 +28,7 @@ export class Client {
     async setLang(lang: string): Promise<void> {
         const res = await fetch(`${BASE}/prefs/lang`, {
             method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
             body: JSON.stringify({lang}),
         });
         await this.parse(res);

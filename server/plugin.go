@@ -47,8 +47,8 @@ type Plugin struct {
 	// prefStore persists per-user target-language preferences.
 	prefStore *langPrefStore
 
-	// resolvePostText fetches the text of a post by ID. Swappable for tests.
-	resolvePostText func(postID string) (string, error)
+	// resolvePostText fetches the text of a post by ID, enforcing channel read permission. Swappable for tests.
+	resolvePostText func(userID, postID string) (string, error)
 
 	// authStatus returns whether the Codex auth token is connected. Swappable for tests.
 	authStatus func() bool
@@ -78,10 +78,13 @@ func (p *Plugin) OnActivate() error {
 		fallback: func() string { return p.getConfiguration().defaultLanguage() },
 	}
 
-	p.resolvePostText = func(postID string) (string, error) {
+	p.resolvePostText = func(userID, postID string) (string, error) {
 		post, err := p.client.Post.GetPost(postID)
 		if err != nil {
 			return "", err
+		}
+		if !p.API.HasPermissionToChannel(userID, post.ChannelId, model.PermissionReadChannel) {
+			return "", errors.New("not authorized to read this message")
 		}
 		return post.Message, nil
 	}

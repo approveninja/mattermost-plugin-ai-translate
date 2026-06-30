@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -57,6 +58,22 @@ func TestHandleTranslateMapsErrors(t *testing.T) {
 	p.ServeHTTP(nil, w, r)
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 	assert.Contains(t, w.Body.String(), "isn't set up")
+}
+
+func TestHandleTranslateDeniedPost(t *testing.T) {
+	p := &Plugin{
+		translator:      stubTranslator{out: "x"},
+		resolvePostText: func(_, _ string) (string, error) { return "", errors.New("denied") },
+	}
+	p.router = p.initRouter()
+
+	body, _ := json.Marshal(map[string]string{"postId": "somepostid", "targetLang": "EN"})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/translate", bytes.NewReader(body))
+	r.Header.Set("Mattermost-User-ID", "u1")
+	p.ServeHTTP(nil, w, r)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
 func TestHandleAuthStatus(t *testing.T) {

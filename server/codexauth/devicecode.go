@@ -22,8 +22,11 @@ type DeviceLogin struct {
 // BeginDeviceLogin requests a user code from the OAuth device endpoint.
 func (a *Authenticator) BeginDeviceLogin(ctx context.Context) (DeviceLogin, error) {
 	body, _ := json.Marshal(map[string]string{"client_id": clientID})
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		a.authBase()+"/api/accounts/deviceauth/usercode", bytes.NewReader(body))
+	if err != nil {
+		return DeviceLogin{}, fmt.Errorf("build device code request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.http.Do(req)
 	if err != nil {
@@ -59,8 +62,11 @@ func (a *Authenticator) BeginDeviceLogin(ctx context.Context) (DeviceLogin, erro
 // PollDeviceLogin polls once. done=true means tokens were obtained and saved.
 func (a *Authenticator) PollDeviceLogin(ctx context.Context, dl DeviceLogin) (bool, error) {
 	body, _ := json.Marshal(map[string]string{"device_auth_id": dl.DeviceAuthID, "user_code": dl.UserCode})
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		a.authBase()+"/api/accounts/deviceauth/token", bytes.NewReader(body))
+	if err != nil {
+		return false, fmt.Errorf("build device poll request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.http.Do(req)
 	if err != nil {
@@ -107,8 +113,11 @@ func (a *Authenticator) exchangeCode(ctx context.Context, code, verifier string)
 		"client_id":     {clientID},
 		"code_verifier": {verifier},
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, a.tokenURL,
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.tokenURL,
 		strings.NewReader(form.Encode()))
+	if err != nil {
+		return Tokens{}, fmt.Errorf("build token exchange request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := a.http.Do(req)
 	if err != nil {

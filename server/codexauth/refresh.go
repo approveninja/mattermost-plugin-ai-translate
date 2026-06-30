@@ -15,7 +15,7 @@ import (
 
 const (
 	clientID        = "app_EMoamEEZ73f0CkXaXp7hrann"
-	defaultTokenURL = "https://auth.openai.com/oauth/token"
+	defaultTokenURL = "https://auth.openai.com/oauth/token" //nolint:gosec // public OAuth token endpoint URL, not a secret
 )
 
 func nowRFC3339() string {

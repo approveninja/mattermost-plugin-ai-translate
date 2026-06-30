@@ -12,7 +12,7 @@ type codexAdmin struct {
 	store *codexauth.Store
 }
 
-func (c codexAdmin) Status() bool { _, ok, _ := c.store.Load(); return ok }
+func (c codexAdmin) Status() bool  { _, ok, _ := c.store.Load(); return ok }
 func (c codexAdmin) Logout() error { return c.store.Clear() }
 
 func (c codexAdmin) Login(ctx context.Context) (string, string, func() error, error) {

@@ -15,6 +15,7 @@ func (f *fakeKV2) Get(key string, out any) error {
 	}
 	return nil
 }
+
 func (f *fakeKV2) Set(key string, value any) (bool, error) {
 	f.m[key] = value.(string)
 	return true, nil

@@ -2,7 +2,7 @@ package codexauth
 
 import "github.com/pkg/errors"
 
-const tokensKey = "codex_oauth_tokens"
+const tokensKey = "codex_oauth_tokens" //nolint:gosec // KV key name, not a credential
 
 // Tokens is the persisted Codex OAuth credential bundle.
 type Tokens struct {

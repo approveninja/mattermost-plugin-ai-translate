@@ -88,7 +88,7 @@ func (a *Authenticator) PollDeviceLogin(ctx context.Context, dl DeviceLogin) (bo
 		AuthorizationCode string `json:"authorization_code"`
 		CodeVerifier      string `json:"code_verifier"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&d); err != nil {
 		return false, err
 	}
 	if d.AuthorizationCode == "" || d.CodeVerifier == "" {

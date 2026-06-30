@@ -19,6 +19,7 @@ func (f *fakeKV) Get(key string, out any) error {
 	}
 	return json.Unmarshal(b, out)
 }
+
 func (f *fakeKV) Set(key string, value any) (bool, error) {
 	b, _ := json.Marshal(value)
 	f.data[key] = b

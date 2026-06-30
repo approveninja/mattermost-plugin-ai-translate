@@ -13,9 +13,18 @@ const DefaultLanguage = "EN"
 
 // Languages is the fixed, ordered list shown in the UI.
 var Languages = []Language{
-	{"EN", "English"}, {"UA", "Ukrainian"}, {"RU", "Russian"}, {"PL", "Polish"},
-	{"ES", "Spanish"}, {"FR", "French"}, {"DE", "German"}, {"ZH", "Chinese"},
-	{"IT", "Italian"}, {"PT", "Portuguese"}, {"JA", "Japanese"}, {"TR", "Turkish"},
+	{"EN", "English"},
+	{"UA", "Ukrainian"},
+	{"RU", "Russian"},
+	{"PL", "Polish"},
+	{"ES", "Spanish"},
+	{"FR", "French"},
+	{"DE", "German"},
+	{"ZH", "Chinese"},
+	{"IT", "Italian"},
+	{"PT", "Portuguese"},
+	{"JA", "Japanese"},
+	{"TR", "Turkish"},
 }
 
 // LanguageName returns the English display name for a language code (case-insensitive).

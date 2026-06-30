@@ -30,10 +30,12 @@ func (l clusterLocker) Lock(ctx context.Context) (func(), error) {
 // kvAdapter adapts *pluginapi.KVService (variadic Set) to codexauth.KV.
 type kvAdapter struct{ kv *pluginapi.KVService }
 
-func (a kvAdapter) Get(key string, out any) error          { return a.kv.Get(key, out) }
+func (a kvAdapter) Get(key string, out any) error           { return a.kv.Get(key, out) }
 func (a kvAdapter) Set(key string, value any) (bool, error) { return a.kv.Set(key, value) }
-func (a kvAdapter) Delete(key string) error                { return a.kv.Delete(key) }
+func (a kvAdapter) Delete(key string) error                 { return a.kv.Delete(key) }
 
 // compile-time interface checks
-var _ codexauth.Locker = clusterLocker{}
-var _ codexauth.KV = kvAdapter{}
+var (
+	_ codexauth.Locker = clusterLocker{}
+	_ codexauth.KV     = kvAdapter{}
+)

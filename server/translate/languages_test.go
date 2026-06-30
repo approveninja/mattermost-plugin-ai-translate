@@ -1,8 +1,10 @@
 package translate
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+)
 
 func TestLanguageName(t *testing.T) {
 	name, ok := LanguageName("ES")

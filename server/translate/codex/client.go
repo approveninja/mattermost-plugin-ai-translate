@@ -73,16 +73,16 @@ func (c *Client) Translate(ctx context.Context, text, targetLang string) (string
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 
-	switch {
-	case resp.StatusCode == http.StatusOK:
+	switch resp.StatusCode {
+	case http.StatusOK:
 		out, err := extractText(body)
 		if err != nil {
 			return "", fmt.Errorf("%w: %v", translate.ErrUpstream, err)
 		}
 		return out, nil
-	case resp.StatusCode == http.StatusTooManyRequests:
+	case http.StatusTooManyRequests:
 		return "", translate.ErrQuota
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return "", translate.ErrReloginRequired
 	default:
 		return "", fmt.Errorf("%w: status %d: %s", translate.ErrUpstream, resp.StatusCode, string(body))

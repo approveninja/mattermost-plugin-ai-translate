@@ -8,13 +8,7 @@ import type {GlobalState} from '@mattermost/types/store';
 
 import type {PluginRegistry} from 'types/mattermost-webapp';
 
-import {TranslateControl} from './components/translate_control';
 import {translationState} from './translation_state';
-
-// TranslateControl is imported for future per-post mounting. Per-post mounting
-// via registry is pending the Task 0 webapp spike (plan Task 0 Step 3).
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-void TranslateControl;
 
 export default class Plugin {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -25,9 +19,7 @@ export default class Plugin {
         registry.registerMessageWillFormatHook((post: any, message: string) =>
             translationState.displayText(post.id, message));
 
-        // TODO (Task 0 Step 3 spike): register TranslateControl as a per-post
-        // action component once the correct registry mechanism is confirmed.
-        // Candidate: registry.registerPostActionComponent(TranslateControl)
+        // Per-post mounting of TranslateControl is pending the live webapp spike (see docs plan Task 0 Step 3).
     }
 }
 

@@ -124,9 +124,14 @@ func (p *Plugin) handleSetLang(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request.")
 		return
 	}
-	if err := p.prefStore.Set(userID, body.Lang); err != nil {
+	canonical := strings.ToUpper(strings.TrimSpace(body.Lang))
+	if !translate.IsSupported(canonical) {
 		writeJSONError(w, http.StatusBadRequest, "Unsupported language.")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"lang": strings.ToUpper(body.Lang)})
+	if err := p.prefStore.Set(userID, body.Lang); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Could not save preference.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"lang": canonical})
 }

@@ -43,6 +43,9 @@ type Plugin struct {
 	// translator calls the Codex API to translate messages.
 	translator translate.Translator
 
+	// resolvePostText fetches the text of a post by ID. Swappable for tests.
+	resolvePostText func(postID string) (string, error)
+
 	// configurationLock synchronizes access to the configuration.
 	configurationLock sync.RWMutex
 
@@ -61,6 +64,14 @@ func (p *Plugin) OnActivate() error {
 	locker := clusterLocker{api: p.API, key: "codex_oauth_refresh"}
 	p.authenticator = codexauth.NewAuthenticator(store, locker, nil, "")
 	p.translator = codex.New(p.authenticator, p.getConfiguration().model(), "", nil)
+
+	p.resolvePostText = func(postID string) (string, error) {
+		post, err := p.client.Post.GetPost(postID)
+		if err != nil {
+			return "", err
+		}
+		return post.Message, nil
+	}
 
 	p.commandClient = command.NewCommandHandler(p.client)
 

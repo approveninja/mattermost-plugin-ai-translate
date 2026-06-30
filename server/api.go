@@ -23,6 +23,8 @@ func (p *Plugin) initRouter() *mux.Router {
 
 	apiRouter.HandleFunc("/hello", p.HelloWorld).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/translate", p.handleTranslate).Methods(http.MethodPost)
+	apiRouter.HandleFunc("/prefs/lang", p.handleGetLang).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/prefs/lang", p.handleSetLang).Methods(http.MethodPut)
 
 	return router
 }
@@ -99,4 +101,32 @@ func (p *Plugin) HelloWorld(w http.ResponseWriter, r *http.Request) {
 		p.API.LogError("Failed to write response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// handleGetLang returns the stored language preference for the requesting user.
+func (p *Plugin) handleGetLang(w http.ResponseWriter, r *http.Request) {
+	userID := r.Header.Get("Mattermost-User-ID")
+	lang, err := p.prefStore.Get(userID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Could not load preference.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"lang": lang})
+}
+
+// handleSetLang stores the language preference for the requesting user.
+func (p *Plugin) handleSetLang(w http.ResponseWriter, r *http.Request) {
+	userID := r.Header.Get("Mattermost-User-ID")
+	var body struct {
+		Lang string `json:"lang"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Invalid request.")
+		return
+	}
+	if err := p.prefStore.Set(userID, body.Lang); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Unsupported language.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"lang": strings.ToUpper(body.Lang)})
 }

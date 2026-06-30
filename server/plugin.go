@@ -43,6 +43,9 @@ type Plugin struct {
 	// translator calls the Codex API to translate messages.
 	translator translate.Translator
 
+	// prefStore persists per-user target-language preferences.
+	prefStore *langPrefStore
+
 	// resolvePostText fetches the text of a post by ID. Swappable for tests.
 	resolvePostText func(postID string) (string, error)
 
@@ -64,6 +67,11 @@ func (p *Plugin) OnActivate() error {
 	locker := clusterLocker{api: p.API, key: "codex_oauth_refresh"}
 	p.authenticator = codexauth.NewAuthenticator(store, locker, nil, "")
 	p.translator = codex.New(p.authenticator, p.getConfiguration().model(), "", nil)
+
+	p.prefStore = &langPrefStore{
+		kv:       kvAdapter{&p.client.KV},
+		fallback: func() string { return p.getConfiguration().defaultLanguage() },
+	}
 
 	p.resolvePostText = func(postID string) (string, error) {
 		post, err := p.client.Post.GetPost(postID)

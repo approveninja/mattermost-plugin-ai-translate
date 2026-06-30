@@ -58,3 +58,14 @@ func TestHandleTranslateMapsErrors(t *testing.T) {
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 	assert.Contains(t, w.Body.String(), "isn't set up")
 }
+
+func TestHandleAuthStatus(t *testing.T) {
+	p := &Plugin{authStatus: func() bool { return true }}
+	p.router = p.initRouter()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/auth/status", nil)
+	r.Header.Set("Mattermost-User-ID", "u1")
+	p.ServeHTTP(nil, w, r)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"connected":true`)
+}

@@ -23,6 +23,7 @@ func (p *Plugin) initRouter() *mux.Router {
 
 	apiRouter.HandleFunc("/hello", p.HelloWorld).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/translate", p.handleTranslate).Methods(http.MethodPost)
+	apiRouter.HandleFunc("/auth/status", p.handleAuthStatus).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/prefs/lang", p.handleGetLang).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/prefs/lang", p.handleSetLang).Methods(http.MethodPut)
 
@@ -134,4 +135,13 @@ func (p *Plugin) handleSetLang(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"lang": canonical})
+}
+
+// handleAuthStatus returns whether the Codex auth token is connected.
+func (p *Plugin) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
+	connected := false
+	if p.authStatus != nil {
+		connected = p.authStatus()
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"connected": connected})
 }

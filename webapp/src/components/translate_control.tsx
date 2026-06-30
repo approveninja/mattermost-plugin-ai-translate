@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useState} from 'react';
+import React, {useEffect, useReducer, useState} from 'react';
 
 import {Client} from '../client';
 import {LANGUAGES, DEFAULT_LANGUAGE} from '../languages';
@@ -10,6 +10,9 @@ import {translationState} from '../translation_state';
 const client = new Client();
 
 export function TranslateControl({postId}: {postId: string}) {
+    const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+    useEffect(() => translationState.subscribe(forceUpdate), [postId]);
+
     const existing = translationState.get(postId);
     const [lang, setLang] = useState(existing?.lang || DEFAULT_LANGUAGE);
     const [busy, setBusy] = useState(false);

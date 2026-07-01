@@ -71,7 +71,7 @@ func (p *Plugin) OnActivate() error {
 	locker := clusterLocker{api: p.API, key: "codex_oauth_refresh"}
 	p.authenticator = codexauth.NewAuthenticator(store, locker, nil, "")
 	p.authStatus = func() bool { _, ok, _ := store.Load(); return ok }
-	p.translator = codex.New(p.authenticator, p.getConfiguration().model(), "", nil)
+	p.translator = codex.New(p.authenticator, func() string { return p.getConfiguration().model() }, "", nil)
 
 	p.prefStore = &langPrefStore{
 		kv:       kvAdapter{&p.client.KV},

@@ -34,7 +34,7 @@ func TestTranslateSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New(fakeTokens{"tok123"}, "gpt-5.5", srv.URL, srv.Client())
+	c := New(fakeTokens{"tok123"}, func() string { return "gpt-5.5" }, srv.URL, srv.Client())
 	got, err := c.Translate(context.Background(), "Hola", "EN")
 	require.NoError(t, err)
 	assert.Equal(t, "Hello", got)
@@ -45,7 +45,7 @@ func TestTranslateUnauthorizedMapsToRelogin(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 	defer srv.Close()
-	c := New(fakeTokens{"x"}, "gpt-5.5", srv.URL, srv.Client())
+	c := New(fakeTokens{"x"}, func() string { return "gpt-5.5" }, srv.URL, srv.Client())
 	_, err := c.Translate(context.Background(), "Hola", "EN")
 	assert.True(t, errors.Is(err, translate.ErrReloginRequired))
 }
@@ -55,14 +55,41 @@ func TestTranslateRateLimitedMapsToQuota(t *testing.T) {
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer srv.Close()
-	c := New(fakeTokens{"x"}, "gpt-5.5", srv.URL, srv.Client())
+	c := New(fakeTokens{"x"}, func() string { return "gpt-5.5" }, srv.URL, srv.Client())
 	_, err := c.Translate(context.Background(), "Hola", "EN")
 	assert.True(t, errors.Is(err, translate.ErrQuota))
 }
 
 func TestTranslateUnsupportedLanguage(t *testing.T) {
-	c := New(fakeTokens{"x"}, "gpt-5.5", "http://unused", http.DefaultClient)
+	c := New(fakeTokens{"x"}, func() string { return "gpt-5.5" }, "http://unused", http.DefaultClient)
 	_, err := c.Translate(context.Background(), "Hola", "XX")
 	assert.ErrorContains(t, err, "unsupported")
 	_ = strings.TrimSpace // keep import if unused elsewhere
+}
+
+func TestTranslateUsesDynamicModel(t *testing.T) {
+	var capturedModel string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		capturedModel, _ = body["model"].(string)
+		_, _ = io.WriteString(w, `{"output_text":"Hello"}`)
+	}))
+	defer srv.Close()
+
+	model := "gpt-5.5"
+	c := New(fakeTokens{"t"}, func() string { return model }, srv.URL, srv.Client())
+
+	// First call: expect the initial model.
+	_, err := c.Translate(context.Background(), "Hola", "EN")
+	require.NoError(t, err)
+	assert.Equal(t, "gpt-5.5", capturedModel)
+
+	// Change the model without rebuilding the client.
+	model = "gpt-5.5-mini"
+
+	// Second call: expect the updated model.
+	_, err = c.Translate(context.Background(), "Hola", "EN")
+	require.NoError(t, err)
+	assert.Equal(t, "gpt-5.5-mini", capturedModel)
 }

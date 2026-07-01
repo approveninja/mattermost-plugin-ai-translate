@@ -20,24 +20,23 @@ type TokenSource interface {
 // Client calls the Codex (ChatGPT-backend) Responses API to translate text.
 type Client struct {
 	tokens  TokenSource
-	model   string
+	modelFn func() string
 	baseURL string
 	http    *http.Client
 }
 
 // New builds a Codex translation client. baseURL defaults to the ChatGPT codex
-// backend when empty; model defaults to gpt-5.5 when empty.
-func New(tokens TokenSource, model, baseURL string, httpClient *http.Client) *Client {
-	if model == "" {
-		model = "gpt-5.5"
-	}
+// backend when empty; model is a provider func called on every request so that
+// config changes take effect without a plugin restart. If modelFn is nil or
+// returns "", the model defaults to "gpt-5.5".
+func New(tokens TokenSource, model func() string, baseURL string, httpClient *http.Client) *Client {
 	if baseURL == "" {
 		baseURL = "https://chatgpt.com/backend-api/codex"
 	}
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &Client{tokens: tokens, model: model, baseURL: strings.TrimRight(baseURL, "/"), http: httpClient}
+	return &Client{tokens: tokens, modelFn: model, baseURL: strings.TrimRight(baseURL, "/"), http: httpClient}
 }
 
 func (c *Client) Translate(ctx context.Context, text, targetLang string) (string, error) {
@@ -50,8 +49,16 @@ func (c *Client) Translate(ctx context.Context, text, targetLang string) (string
 		return "", err
 	}
 
+	model := ""
+	if c.modelFn != nil {
+		model = c.modelFn()
+	}
+	if model == "" {
+		model = "gpt-5.5"
+	}
+
 	payload := map[string]any{
-		"model": c.model,
+		"model": model,
 		"instructions": "You are a translation engine. Translate the user's message into " + name +
 			". Output only the translation, preserving Markdown, mentions, emoji, and code spans.",
 		"input":  text,

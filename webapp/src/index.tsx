@@ -8,6 +8,7 @@ import type {GlobalState} from '@mattermost/types/store';
 
 import type {PluginRegistry} from 'types/mattermost-webapp';
 
+import {registerPostMenu} from './post_menu';
 import {translationState} from './translation_state';
 
 export default class Plugin {
@@ -19,7 +20,10 @@ export default class Plugin {
         registry.registerMessageWillFormatHook((post: any, message: string) =>
             translationState.displayText(post.id, message));
 
-        // Per-post mounting of TranslateControl is pending the live webapp spike (see docs plan Task 0 Step 3).
+        // Register post dropdown menu items: "Translate / Show original" and
+        // the "Translate to" language sub-menu.  This is the primary UI entry
+        // point that makes the translate feature reachable (P1 fix).
+        registerPostMenu(registry);
     }
 }
 

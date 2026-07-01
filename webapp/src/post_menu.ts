@@ -54,35 +54,52 @@ export async function setDefaultLang(code: string, client: Client): Promise<void
  * reading the postId at runtime.
  */
 export function registerPostMenu(registry: any, client: Client = new Client()): void {
-    // Primary action: translate or flip back to original.
-    registry.registerPostDropdownMenuAction(
-        'Translate / Show original',
-        (...args: unknown[]) => {
-            toggleTranslate(String(args[0]), client).catch(
-                (err: unknown) => console.error('[ai-translate] toggleTranslate failed', err), // eslint-disable-line no-console
-            );
-        },
-        () => true,
-    );
-
-    // Language sub-menu: lets the user change their saved preference.
-    const sub = registry.registerPostDropdownSubMenuAction({
-        text: 'Translate to',
-        action: () => {
-            // intentionally empty — sub-items handle their own actions
-        },
-        filter: () => true,
-    });
-
-    LANGUAGES.forEach((l) => {
-        sub.rootRegisterMenuItem(
-            l.name,
-            () => {
-                setDefaultLang(l.code, client).catch(
-                    (err: unknown) => console.error('[ai-translate] setDefaultLang failed', err), // eslint-disable-line no-console
+    // Primary action: translate or flip back to original. This is the core
+    // reachable path — register it independently so a missing sub-menu API
+    // (older server versions) never blocks it.
+    if (typeof registry?.registerPostDropdownMenuAction === 'function') {
+        registry.registerPostDropdownMenuAction(
+            'Translate / Show original',
+            (...args: unknown[]) => {
+                toggleTranslate(String(args[0]), client).catch(
+                    (err: unknown) => console.error('[ai-translate] toggleTranslate failed', err), // eslint-disable-line no-console
                 );
             },
             () => true,
         );
-    });
+    }
+
+    // Language sub-menu: lets the user change their saved preference. Best-effort
+    // and guarded — the sub-menu registry API is not available on every server
+    // version, and a failure here must not break plugin activation.
+    if (typeof registry?.registerPostDropdownSubMenuAction !== 'function') {
+        return;
+    }
+    try {
+        const sub = registry.registerPostDropdownSubMenuAction({
+            text: 'Translate to',
+            action: () => {
+                // intentionally empty — sub-items handle their own actions
+            },
+            filter: () => true,
+        });
+
+        if (!sub || typeof sub.rootRegisterMenuItem !== 'function') {
+            return;
+        }
+
+        LANGUAGES.forEach((l) => {
+            sub.rootRegisterMenuItem(
+                l.name,
+                () => {
+                    setDefaultLang(l.code, client).catch(
+                        (err: unknown) => console.error('[ai-translate] setDefaultLang failed', err), // eslint-disable-line no-console
+                    );
+                },
+                () => true,
+            );
+        });
+    } catch (err) {
+        console.error('[ai-translate] failed to register language sub-menu', err); // eslint-disable-line no-console
+    }
 }

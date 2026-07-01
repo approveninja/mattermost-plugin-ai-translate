@@ -34,10 +34,13 @@ export async function toggleTranslate(postId: string, client: Client): Promise<v
 }
 
 /**
- * Persist a new default translation language for the current user.
+ * Translate a specific post into an explicit language, show it, and persist
+ * the choice as the user's default.
  */
-export async function setDefaultLang(code: string, client: Client): Promise<void> {
-    await client.setLang(code);
+export async function translatePostTo(postId: string, lang: string, client: Client): Promise<void> {
+    const text = await client.translate(postId, lang);
+    translationState.set(postId, {showing: 'translated', lang, text});
+    await client.setLang(lang);
 }
 
 /**
@@ -45,8 +48,8 @@ export async function setDefaultLang(code: string, client: Client): Promise<void
  *
  * Two items are added:
  *  1. "Translate / Show original" — toggles translation for the clicked post.
- *  2. "Translate to" sub-menu — one entry per supported language that updates
- *     the user's saved language preference.
+ *  2. "Translate to" sub-menu — one entry per supported language that translates
+ *     the clicked post into that language and persists the choice as the default.
  *
  * NOTE: The flat `registerPostDropdownMenuAction` types its action as `() => void`
  * but at runtime Mattermost passes the postId as the first argument.  We therefore
@@ -69,19 +72,23 @@ export function registerPostMenu(registry: any, client: Client = new Client()): 
         );
     }
 
-    // Language sub-menu: lets the user change their saved preference. Best-effort
-    // and guarded — the sub-menu registry API is not available on every server
-    // version, and a failure here must not break plugin activation.
+    // Language sub-menu: lets the user translate the clicked post into a specific
+    // language and persist that choice as their default. Best-effort and guarded
+    // — the sub-menu registry API is not available on every server version, and a
+    // failure here must not break plugin activation.
     if (typeof registry?.registerPostDropdownSubMenuAction !== 'function') {
         return;
     }
     try {
+        // Capture the postId from the root filter so sub-item actions can use it.
+        let currentPostId = '';
         const sub = registry.registerPostDropdownSubMenuAction({
             text: 'Translate to',
-            action: () => {
-                // intentionally empty — sub-items handle their own actions
+            action: () => { /* root click just opens the submenu */ },
+            filter: (postId: string) => {
+                currentPostId = String(postId);
+                return true;
             },
-            filter: () => true,
         });
 
         if (!sub || typeof sub.rootRegisterMenuItem !== 'function') {
@@ -92,8 +99,8 @@ export function registerPostMenu(registry: any, client: Client = new Client()): 
             sub.rootRegisterMenuItem(
                 l.name,
                 () => {
-                    setDefaultLang(l.code, client).catch(
-                        (err: unknown) => console.error('[ai-translate] setDefaultLang failed', err), // eslint-disable-line no-console
+                    translatePostTo(currentPostId, l.code, client).catch(
+                        (err: unknown) => console.error('[ai-translate] translatePostTo failed', err), // eslint-disable-line no-console
                     );
                 },
                 () => true,

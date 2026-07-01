@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 
 import type {Client} from './client';
-import {toggleTranslate, setDefaultLang} from './post_menu';
+import {toggleTranslate, translatePostTo, registerPostMenu} from './post_menu';
 import {translationState} from './translation_state';
 
 describe('post_menu', () => {
@@ -44,10 +44,52 @@ describe('post_menu', () => {
         });
     });
 
-    describe('setDefaultLang', () => {
-        it('calls client.setLang with the given code', async () => {
-            await setDefaultLang('FR', fakeClient);
+    describe('translatePostTo', () => {
+        it('translates the post, updates state, and persists the language', async () => {
+            await translatePostTo('p2', 'FR', fakeClient);
+
+            expect(fakeClient.translate).toHaveBeenCalledWith('p2', 'FR');
+            expect(translationState.get('p2')).toEqual({
+                showing: 'translated',
+                lang: 'FR',
+                text: 'Hello',
+            });
             expect(fakeClient.setLang).toHaveBeenCalledWith('FR');
+        });
+    });
+
+    describe('registerPostMenu wiring', () => {
+        it('sub-item action translates the post captured by the root filter', async () => {
+            let rootFilter: ((postId: string) => boolean) | undefined;
+            const subItems: Array<() => void> = [];
+
+            const fakeRegistry = {
+                registerPostDropdownMenuAction: jest.fn(),
+                registerPostDropdownSubMenuAction: jest.fn((opts: {text: string; action: () => void; filter: (postId: string) => boolean}) => {
+                    rootFilter = opts.filter;
+                    return {
+                        rootRegisterMenuItem: (_text: string, action: () => void) => {
+                            subItems.push(action);
+                        },
+                    };
+                }),
+            };
+
+            registerPostMenu(fakeRegistry, fakeClient);
+
+            // Simulate Mattermost calling the root filter with a postId.
+            expect(rootFilter).toBeDefined();
+            rootFilter!('p9');
+
+            // Invoke the first sub-item (English).
+            expect(subItems.length).toBeGreaterThan(0);
+            subItems[0]();
+
+            // Flush microtasks so the async translatePostTo resolves.
+            await new Promise((r) => setTimeout(r, 0));
+            await Promise.resolve();
+
+            expect(fakeClient.translate).toHaveBeenCalledWith('p9', 'EN');
         });
     });
 });

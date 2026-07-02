@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,25 @@ type DeviceLogin struct {
 	VerificationURL string
 	DeviceAuthID    string
 	Interval        int
+}
+
+// flexInt unmarshals a JSON value that may be either a number (5) or a numeric
+// string ("5"). OpenAI's device-auth usercode endpoint returns `interval` as a
+// string, so a plain int field fails to decode.
+type flexInt int
+
+func (f *flexInt) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(strings.TrimSpace(string(b)), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("invalid interval %q: %w", s, err)
+	}
+	*f = flexInt(n)
+	return nil
 }
 
 // BeginDeviceLogin requests a user code from the OAuth device endpoint.
@@ -38,9 +58,9 @@ func (a *Authenticator) BeginDeviceLogin(ctx context.Context) (DeviceLogin, erro
 		return DeviceLogin{}, fmt.Errorf("device code request status %d: %s", resp.StatusCode, string(b))
 	}
 	var d struct {
-		UserCode     string `json:"user_code"`
-		DeviceAuthID string `json:"device_auth_id"`
-		Interval     int    `json:"interval"`
+		UserCode     string  `json:"user_code"`
+		DeviceAuthID string  `json:"device_auth_id"`
+		Interval     flexInt `json:"interval"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
 		return DeviceLogin{}, err
@@ -48,14 +68,12 @@ func (a *Authenticator) BeginDeviceLogin(ctx context.Context) (DeviceLogin, erro
 	if d.UserCode == "" || d.DeviceAuthID == "" {
 		return DeviceLogin{}, fmt.Errorf("incomplete device code response")
 	}
-	if d.Interval < 3 {
-		d.Interval = 3
-	}
+	interval := max(int(d.Interval), 3)
 	return DeviceLogin{
 		UserCode:        d.UserCode,
 		VerificationURL: a.authBase() + "/codex/device",
 		DeviceAuthID:    d.DeviceAuthID,
-		Interval:        d.Interval,
+		Interval:        interval,
 	}, nil
 }
 

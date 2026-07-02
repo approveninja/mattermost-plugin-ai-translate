@@ -10,6 +10,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBeginDeviceLoginParsesStringInterval(t *testing.T) {
+	// OpenAI returns `interval` as a JSON string (e.g. "7"), not a number.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"user_code":"AB-12","device_auth_id":"d1","interval":"7"}`))
+	}))
+	defer srv.Close()
+
+	a := NewAuthenticator(NewStore(newFakeKV()), noopLocker{}, srv.Client(), srv.URL)
+	dl, err := a.BeginDeviceLogin(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "AB-12", dl.UserCode)
+	assert.Equal(t, 7, dl.Interval)
+}
+
 func TestDeviceLoginFlow(t *testing.T) {
 	poll := 0
 	mux := http.NewServeMux()

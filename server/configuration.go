@@ -2,8 +2,11 @@ package main
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/translate"
 )
 
 // configuration captures the plugin's external configuration as exposed in the Mattermost server
@@ -17,7 +20,25 @@ import (
 //
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
-type configuration struct{}
+type configuration struct {
+	Model           string `json:"Model"`
+	DefaultLanguage string `json:"DefaultLanguage"`
+}
+
+func (c *configuration) model() string {
+	if strings.TrimSpace(c.Model) == "" {
+		return "gpt-5.5"
+	}
+	return c.Model
+}
+
+func (c *configuration) defaultLanguage() string {
+	up := strings.ToUpper(strings.TrimSpace(c.DefaultLanguage))
+	if translate.IsSupported(up) {
+		return up
+	}
+	return translate.DefaultLanguage
+}
 
 // Clone shallow copies the configuration. Your implementation may require a deep copy if
 // your configuration has reference types.

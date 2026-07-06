@@ -12,8 +12,11 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi/cluster"
 	"github.com/pkg/errors"
 
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/codexauth"
 	"github.com/approveninja/mattermost-plugin-ai-translate/server/command"
 	"github.com/approveninja/mattermost-plugin-ai-translate/server/store/kvstore"
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/translate"
+	"github.com/approveninja/mattermost-plugin-ai-translate/server/translate/codex"
 )
 
 // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
@@ -34,6 +37,21 @@ type Plugin struct {
 
 	backgroundJob *cluster.Job
 
+	// authenticator manages Codex OAuth tokens with cluster-wide locking.
+	authenticator *codexauth.Authenticator
+
+	// translator calls the Codex API to translate messages.
+	translator translate.Translator
+
+	// prefStore persists per-user target-language preferences.
+	prefStore *langPrefStore
+
+	// resolvePostText fetches the text of a post by ID, enforcing channel read permission. Swappable for tests.
+	resolvePostText func(userID, postID string) (string, error)
+
+	// authStatus returns whether the Codex auth token is connected. Swappable for tests.
+	authStatus func() bool
+
 	// configurationLock synchronizes access to the configuration.
 	configurationLock sync.RWMutex
 
@@ -48,7 +66,34 @@ func (p *Plugin) OnActivate() error {
 
 	p.kvstore = kvstore.NewKVStore(p.client)
 
-	p.commandClient = command.NewCommandHandler(p.client)
+	store := codexauth.NewStore(kvAdapter{&p.client.KV})
+	locker := clusterLocker{api: p.API, key: "codex_oauth_refresh"}
+	p.authenticator = codexauth.NewAuthenticator(store, locker, nil, "")
+	p.authStatus = func() bool { _, ok, _ := store.Load(); return ok }
+	p.translator = codex.New(p.authenticator, func() string { return p.getConfiguration().model() }, "", nil)
+
+	p.prefStore = &langPrefStore{
+		kv:       kvAdapter{&p.client.KV},
+		fallback: func() string { return p.getConfiguration().defaultLanguage() },
+	}
+
+	p.resolvePostText = func(userID, postID string) (string, error) {
+		post, err := p.client.Post.GetPost(postID)
+		if err != nil {
+			return "", err
+		}
+		if !p.API.HasPermissionToChannel(userID, post.ChannelId, model.PermissionReadChannel) {
+			return "", errors.New("not authorized to read this message")
+		}
+		return post.Message, nil
+	}
+
+	admin := codexAdmin{auth: p.authenticator, store: store}
+	isSysAdmin := func(userID string) bool {
+		u, err := p.client.User.Get(userID)
+		return err == nil && u.IsSystemAdmin()
+	}
+	p.commandClient = command.NewCommandHandler(p.client, admin, isSysAdmin)
 
 	p.router = p.initRouter()
 
